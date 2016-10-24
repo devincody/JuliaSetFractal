@@ -36,48 +36,45 @@ float map2axis(int numb, float min, float max, int tot){
 }
 
 int main(){
-	imaginary *c;
+	FILE *f;
+	float ans;
+	float I;
+	float R;
+	float max = 255;
+	float value;
+	int iterations = 255;
+	int width= 3840;
+	int height = 2160;
+	int filesize = 54 + 3*width*height;
+	int imgsize = 3*width*height;
+
+	imaginary *N; // Pixel imaginary value
+	N = (imaginary *)malloc(sizeof(imaginary));
+
+	imaginary *c; // Constant added for every squaring
 	c = (imaginary *)malloc(sizeof(imaginary));
-	for(int w = 0; w < 1000; w++){
+
+	unsigned char *img = NULL; 
+	img = (unsigned char *) malloc(imgsize); //Matrix for saving Image
+	memset(img,0,imgsize);
+
+	for(int w = 0; w < 1000; w++){	//Vary Additive Constant
 		c->real = ((float) w)/500. - 1.;
 		c->im = .6;
-		FILE *f;
-		unsigned char *img = NULL;
-		int width;
-		int height;
-		if (img){
-			free(img);
-		}
 
-		width = 1440;
-		height = 900; //
-		int filesize = 54 + 3*width*height;
-		int imgsize = 3*width*height;
-		img = (unsigned char *)malloc(imgsize);
-		memset(img,0,imgsize);
-
-
-		float ans;
-		float I;
-		float R;
-		float max = 255;
-		float value;
-		int iterations = 255;
-
-		for(int i= 0 ;i <width; i++){
+		for(int i= 0 ;i < ((int) (((float) width)+1.0)/2.0); i++){
 			for (int j = 0; j < height; j++){
 				//Map i onto real part, j onto imaginary part
-				imaginary *N;
-				N = (imaginary *)malloc(sizeof(imaginary));
-				N->real = map2axis(i, -1.6, 1.6, width);
-				N->im = map2axis(j, -1.0, 1.0, height);
+				N->real = map2axis(i, -2., 2, width);
+				N->im = map2axis(j, -1.125, 1.125, height);
+
 				ans = 0;
 
+				//See if point is in Julia set
 				for (int z = 0; z < iterations; z++){
 					Zmult(N,N,N);
 					Zadd(N,c,N);
 					ans = pow(Zmag2(N),.5);
-					
 					if (ans > max){
 						ans = z;
 						break;
@@ -87,7 +84,7 @@ int main(){
 				int x = i;
 				int y = height - 1 - j;
 
-				I = N -> im;
+				I = N->im;
 				R = N->real;
 				
 				if (I > 255){
@@ -101,14 +98,22 @@ int main(){
 					ans = 255;
 				}
 
+				//Choose how information is encoded with color
+				img[(x + y*width)*3+2] = (unsigned char)(ans); //red
+				img[(x + y*width)*3+1] = (unsigned char)(ans); //green
+				img[(x + y*width)*3+0] = (unsigned char)(ans); //blue
+
+				x = width - i - 1;
+				y = j;
 
 				img[(x + y*width)*3+2] = (unsigned char)(ans); //red
 				img[(x + y*width)*3+1] = (unsigned char)(ans); //green
 				img[(x + y*width)*3+0] = (unsigned char)(ans); //blue
+				
 			}
 		}
 
-
+		// Write BMP file
 		unsigned char bmpfileheader[14] = {'B','M', 0,0,0,0, 0,0, 0,0, 54,0,0,0};
 		unsigned char bmpinfoheader[40] = {40,0,0,0, 0,0,0,0, 0,0,0,0, 1,0, 24,0};
 		unsigned char bmppad[3] = {0,0,0};
@@ -127,40 +132,41 @@ int main(){
 		bmpinfoheader[10] = (unsigned char)(       height>>16);
 		bmpinfoheader[11] = (unsigned char)(       height>>24);
 
-		char filename[] = "/data2/frame";
+		//Save each image with unique filename
+		char filename[] = "/data3/frame";
 		char fileend[] = ".bmp";
 		char cwda[1024];
 		getcwd(cwda,1024);
 		strcat(cwda, filename);
 		char numberstring[4];
-		//printf("about to write\n");
 		sprintf(numberstring, "%04d", w);
-		
 		strcat(cwda,numberstring);
 		strcat(cwda, ".bmp");
 		f = fopen(cwda, "w+");
-		printf("%s\n",cwda );
 		if (f == NULL) {
 	    	printf ("Error opening input file %s\n", cwda);
 	    	exit (1);
 		}
+		printf("%s\n",numberstring);
 
-		//f = fopen("fractal.bmp","wb");
+		//Write data to file
 		fwrite(bmpfileheader,1,14,f);
 		fwrite(bmpinfoheader,1,40,f);
 		for(int i=0; i<height; i++){
 		    fwrite(img+(width*(height-i-1)*3),3,width,f);
 		    fwrite(bmppad,1,(4-(width*3)%4)%4,f);
 		}
-		fclose(f);
-
-		
+		fclose(f);	
 	}
+
+	free(img);
+	free(N);
+	free(c);
 	return 0;
 }
 
 
-//  ffmpeg -i frames/%4d.bmp -c:v libx264 -r 15 -pix_fmt yuv420p Julia.mp4
+//  ffmpeg -i data/frames%4d.bmp -c:v libx264 -r 15 -pix_fmt yuv420p Julia.mp4
 
 
 
